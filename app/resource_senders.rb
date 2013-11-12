@@ -23,21 +23,37 @@ class HTTPResourceSender
 
   def form_headers request
     headers = [
-        "http/1.1 200 ok",
-        "connection: keep-alive",
-        "date: #{ Time.now }",
-        "server: WebServerLight"
+        "HTTP/1.1 200 OK",
+        "Date: #{ Time.now }",
+        "Server: WebServerLight",
+        "Content-Type: #{define_content_type request.file_path}",
+        "Cache-Control: no-cache"
     ]
 
     base_name = File.basename request.file_path
     unless base_name == 'index.html'
-
-      headers.push "content-disposition: attachment; filename=\"#{base_name}\""
-      headers.push "content-length: #{File.size(request.file_path)}"
+      #headers.push "content-disposition: attachment; filename=\"#{base_name}\""
+      #headers.push "content-length: #{File.size(request.file_path)}"
     end
 
     headers.last << "\r\n\r\n"
     headers.join("\r\n")
+  end
+
+  def define_content_type(path)
+    ext = File.extname(path)
+    return "text/html"  if ext == ".html" or ext == ".htm"
+    return "text/plain" if ext == ".txt"
+    return "text/css"   if ext == ".css"
+    return "image/jpeg" if ext == ".jpeg" or ext == ".jpg"
+    return "image/gif"  if ext == ".gif"
+    return "image/bmp"  if ext == ".bmp"
+    return "image/x-icon" if ext == ".ico"
+    return "text/plain" if ext == ".rb"
+    return "text/xml"   if ext == ".xml"
+    return "text/xml"   if ext == ".xsl"
+
+    "text/html"
   end
 
 =begin
