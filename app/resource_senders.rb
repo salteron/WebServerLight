@@ -11,16 +11,18 @@ end
 class HTTPResourceSender
 
   def send_resource request
-    headers = ["http/1.1 200 ok",
+    headers = [
+               "http/1.1 200 ok",
                "connection: keep-alive",
                "date: #{ Time.now }",
                "server: WebServerLight"
-               ]
+              ]
 
-    unless request.resource == '/index.html'
-      filename = File.basename request.file_path
-      headers.push "content-length: #{filename.size}"
-      headers.push "content-disposition: attachment; filename=\"#{filename}"
+    base_name = File.basename request.file_path
+    unless base_name == 'index.html'
+
+      headers.push "content-disposition: attachment; filename=\"#{base_name}\""
+      headers.push "content-length: #{File.size(request.file_path)}"
     end
 
     headers.last << "\r\n\r\n"
