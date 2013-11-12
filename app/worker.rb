@@ -15,10 +15,11 @@ class Worker
     loop do
       begin
         client = server.accept
-        puts "#{idx} accepted connection!"
 
-        request = @request_handler.parse client
+        request           = @request_handler.parse client
         request.file_path = resolve_resource_into_path request.resource
+
+        puts "#{idx} accepted connection for file #{request.resource} (#{request.file_path})"
 
         @resource_sender.send_resource request
       rescue => e
@@ -33,7 +34,7 @@ class Worker
     base_path = @settings[:base_path]
     path      = File.expand_path File.join base_path, resource
 
-    (path.match(/#{base_path}/) and not File.directory?(path) and File.exists?(path)) ?
-        path : File.join(base_path, '/index.html')
+    (path.index(base_path) == 0 and File.file?(path) and File.exists?(path)) ?
+        path : File.join(base_path, 'index.html')
   end
 end

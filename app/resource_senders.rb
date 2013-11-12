@@ -11,12 +11,23 @@ end
 class HTTPResourceSender
 
   def send_resource request
+
+    request.client.puts form_headers(request)
+
+    File.open(request.file_path, 'r') do |src|
+      until src.eof?
+        request.client.write src.read(256)
+      end
+    end
+  end
+
+  def form_headers request
     headers = [
-               "http/1.1 200 ok",
-               "connection: keep-alive",
-               "date: #{ Time.now }",
-               "server: WebServerLight"
-              ]
+        "http/1.1 200 ok",
+        "connection: keep-alive",
+        "date: #{ Time.now }",
+        "server: WebServerLight"
+    ]
 
     base_name = File.basename request.file_path
     unless base_name == 'index.html'
@@ -27,14 +38,6 @@ class HTTPResourceSender
 
     headers.last << "\r\n\r\n"
     headers.join("\r\n")
-
-    request.client.puts headers
-
-    File.open(request.file_path, 'r') do |src|
-      until src.eof?
-        request.client.write src.read(256)
-      end
-    end
   end
 
 =begin

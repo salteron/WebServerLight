@@ -20,7 +20,7 @@ class HTTPRequestHandler
 
     request_line = lines[0]
 
-    resource = request_line =~ /^GET\s+(\/\S+)/i ? $1 : "/index.html"
+    resource = request_line =~ /^GET\s+\/(\S+)/i ? $1 : "index.html"
 
     Request.new client, resource
   end
