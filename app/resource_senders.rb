@@ -31,7 +31,9 @@ class HTTPResourceSender
     request.client.puts headers
 
     File.open(request.file_path, 'r') do |src|
-      request.client.puts src.read
+      until src.eof?
+        request.client.write src.read(256)
+      end
     end
   end
 
