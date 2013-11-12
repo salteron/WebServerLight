@@ -2,25 +2,31 @@ require 'request_handlers.rb'
 require 'resource_senders.rb'
 
 class Worker
-  attr_reader :request_handler, :resource_sender, :settings, :client
+  attr_reader :request_handler, :resource_sender, :settings
 
-  def initialize(client, settings)
-    @client          = client
+  def initialize(settings)
     @settings        = settings
 
     @request_handler = HTTPRequestHandler.new
     @resource_sender = HTTPResourceSender.new
   end
 
-  def work
-    request           = @request_handler.parse @client
-    request.file_path = resolve_resource_into_path request.resource
+  def work server, idx
+    loop do
+      begin
+        client = server.accept
+        puts "#{idx} accepted connection!"
 
-    @resource_sender.send_resource request
-  rescue => e
-    puts e.message
-  ensure
-    @client.close
+        request = @request_handler.parse client
+        request.file_path = resolve_resource_into_path request.resource
+
+        @resource_sender.send_resource request
+      rescue => e
+        puts "#{idx} error: " + e.message
+      ensure
+        client.close
+      end
+    end
   end
 
   def resolve_resource_into_path resource

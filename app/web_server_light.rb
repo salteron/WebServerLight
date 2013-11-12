@@ -8,16 +8,16 @@ module WebServerLight
   def self.run base_path
     server = TCPServer.open(3000)
     trap(:INT) { exit }
+    threads = []
 
-    loop do
-      client      = server.accept
-      client.sync = true
-
-      w = Worker.new(client, base_path: base_path)
-
-      Thread.new do
-        w.work
+    5.times do
+      threads << Thread.new(server, threads.count) do |s, c|
+        Worker.new(base_path: base_path).work s, c
       end
     end
+
+  threads.each &:join
+  ensure
+    server.close
   end
 end
