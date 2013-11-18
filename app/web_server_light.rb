@@ -5,7 +5,7 @@ require 'worker.rb'
 require 'socket'
 
 class WebServerLight
-  NUM_OF_WORKERS    = 1
+  NUM_OF_WORKERS    = 5
   DEFAULT_TIMEOUT   = 5
 
   attr_accessor :client_queue
