@@ -8,8 +8,6 @@ class HTTPResourceSender
     File.open(request.file_path, 'r') do |src|
       request.client.write src.read(256) until src.eof?
     end
-  rescue Errno::EPIPE
-    raise 'client closed connection'
   end
 
   def form_headers(request)

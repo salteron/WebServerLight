@@ -2,6 +2,12 @@
 require 'timeout'
 
 class HTTPRequestHandler
+  HTTP_REQUEST_LINE_REGEXP = %r{
+      ^GET            # http method
+      \s+             # whitespaces
+      \/(?<uri>\S+)   # uri
+    }xi
+
   attr_accessor :timeout
 
   def initialize(timeout)
@@ -17,13 +23,14 @@ class HTTPRequestHandler
 
   def read(client)
     lines = []
-    line  = nil
 
     Timeout.timeout(@timeout) do
-      lines << line.chomp while (line = client.gets) && line !~ /^\s*$/
-
-      lines
+      while (line = client.gets) && line !~ /^\s*$/
+        lines << line.chomp
+      end
     end
+
+    lines
   rescue Timeout::Error
     raise 'slow client rejected'
   end
@@ -31,13 +38,7 @@ class HTTPRequestHandler
   def parse(lines)
     request_line = lines[0]
 
-    req_line_regexp = %r{
-      ^GET            # http method
-      \s+             # whitespaces
-      \/(?<uri>\S+)   # uri
-    }xi
-
-    match    = req_line_regexp.match(request_line)
+    match    = HTTP_REQUEST_LINE_REGEXP.match(request_line)
     match ? match[:uri] : 'index.html'
   end
 end

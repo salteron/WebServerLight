@@ -13,7 +13,7 @@ class Worker
     @settings        = settings
     @idx             = idx
 
-    @request_handler  = HTTPRequestHandler.new(@settings[:timeout])
+    @request_handler = HTTPRequestHandler.new(@settings[:timeout])
     @resource_sender = HTTPResourceSender.new
   end
 
@@ -25,12 +25,14 @@ class Worker
         request           = @request_handler.handle client
         request.file_path = resolve_resource_into_path request.resource
 
-        puts "#{@idx} accepted connection for file #{request.resource}" \
-             " (#{request.file_path})"
+        puts "Worker ##{@idx}: accepted connection for file" \
+             " #{request.resource} (#{request.file_path})"
 
         @resource_sender.send_resource request
+      rescue Errno::EPIPE
+        raise "Worker ##{@idx}: client closed connection"
       rescue => e
-        puts "#{@idx} error: " + e.message
+        puts "Worker##{@idx}: #{e.message}"
       ensure
         client.close
       end

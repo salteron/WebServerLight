@@ -5,7 +5,7 @@ require 'worker.rb'
 require 'socket'
 
 class WebServerLight
-  NUM_OF_WORKERS    = 5
+  NUM_OF_WORKERS    = 1
   DEFAULT_TIMEOUT   = 5
 
   attr_accessor :client_queue
@@ -38,15 +38,23 @@ class WebServerLight
   end
 
   def run
-    worker_threads = init_workers
+    init_workers
+    sockets = [@server]            # An array of sockets we'll monitor
 
     loop do
-      client = @server.accept
+      ready   = select(sockets)    # Wait for sockets to be ready
+      readable = ready[0]          # These sockets are readable
 
-      client_queue << client
+      readable.each do |socket|
+        if socket == @server       # If the server socket is ready
+          client = @server.accept  # Accept a new client
+          sockets << client        # Add it to the set of sockets
+        else                       # Otherwise, a client is ready
+          sockets.delete(socket)   # Удаляем из общей очереди соединений
+          @client_queue << socket  # Пушим в очередь, просматриваемую воркерами
+        end
+      end
     end
-
-    worker_threads.each(&:join)
   ensure
     server.close if server
   end
