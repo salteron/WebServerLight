@@ -11,10 +11,10 @@ class Worker
     @resource_sender = HTTPResourceSender.new
   end
 
-  def work(server, idx)
+  def work(idx)
     loop do
       begin
-        client = server.accept
+        client = WebServerLight.client_queue.pop
 
         request           = @request_handler.parse client
         request.file_path = resolve_resource_into_path request.resource

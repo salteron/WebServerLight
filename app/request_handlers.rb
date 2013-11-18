@@ -1,4 +1,4 @@
-require 'webrick'
+require 'timeout'
 
 class Request
   attr_accessor :client, :resource, :file_path
@@ -14,8 +14,11 @@ class HTTPRequestHandler
   def parse client
 
     lines = []
-    while (line = client.gets) and line !~ /^\s*$/
-      lines << line.chomp
+    Timeout.timeout(5) do
+
+      while (line = client.gets) and line !~ /^\s*$/
+        lines << line.chomp
+      end
     end
 
     request_line = lines[0]

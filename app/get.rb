@@ -1,6 +1,6 @@
 require 'rest_client'
 
-N = 6
+N = ARGV[0] || 1
 RESOURCE = '/img.jpg'
 
 Thread.abort_on_exception = true
@@ -13,5 +13,3 @@ N.times do
 end
 
 threads.each(&:join)
-
-arr = ['a', 'b', 'c']
