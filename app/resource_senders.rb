@@ -1,6 +1,14 @@
 # -*- encoding : utf-8 -*-
 # TODO: send_file
 
+# Internal: набор методов формирования HTTP ответа, содержащего запрошенный
+# клиентом файл.
+#
+# Examples:
+#
+#   request # => struct, that holds client (socket) info and requested file path
+#   r_sender = HTTPResourceSender.new
+#   r_sender.send_resource request
 class HTTPResourceSender
   def send_resource(request)
     request.client.puts form_headers(request)
@@ -9,6 +17,8 @@ class HTTPResourceSender
       request.client.write src.read(256) until src.eof?
     end
   end
+
+  private
 
   def form_headers(request)
     headers = [
