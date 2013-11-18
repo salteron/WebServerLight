@@ -11,7 +11,7 @@ class Worker
     @resource_sender = HTTPResourceSender.new
   end
 
-  def work server, idx
+  def work(server, idx)
     loop do
       begin
         client = server.accept
@@ -19,9 +19,12 @@ class Worker
         request           = @request_handler.parse client
         request.file_path = resolve_resource_into_path request.resource
 
-        puts "#{idx} accepted connection for file #{request.resource} (#{request.file_path})"
+        puts "#{idx} accepted connection for file #{request.resource}" \
+             " (#{request.file_path})"
 
         @resource_sender.send_resource request
+
+        puts "#{idx} done!"
       rescue => e
         puts "#{idx} error: " + e.message
       ensure
@@ -30,11 +33,11 @@ class Worker
     end
   end
 
-  def resolve_resource_into_path resource
+  def resolve_resource_into_path(resource)
     base_path = @settings[:base_path]
     path      = File.expand_path File.join base_path, resource
 
-    (path.index(base_path) == 0 and File.file?(path) and File.exists?(path)) ?
+    path.index(base_path) == 0 && File.file?(path) && File.exists?(path) ?
         path : File.join(base_path, 'index.html')
   end
 end
