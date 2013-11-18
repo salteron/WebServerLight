@@ -1,6 +1,7 @@
+# -*- encoding : utf-8 -*-
 require 'rest_client'
 
-N = ARGV[0] || 1
+N = ARGV[0] ? ARGV[0].to_i : 1
 RESOURCE = '/img.jpg'
 
 Thread.abort_on_exception = true

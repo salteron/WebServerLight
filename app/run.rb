@@ -1,10 +1,12 @@
 #!/usr/bin/env ruby
+# -*- encoding : utf-8 -*-
 cur_dir = File.expand_path(File.dirname(__FILE__))
 $LOAD_PATH.unshift cur_dir
 
 require 'web_server_light.rb'
 
-base_path = ARGV[0] && File.directory?(ARGV[0]) ? File.expand_path(ARGV[0]) :
-                                                  File.expand_path("#{cur_dir}/../public")
+params = {}
+params[:base_path] = ARGV[0] if ARGV[0]
+params[:timeout]   = ARGV[1] if ARGV[1]
 
-WebServerLight.run base_path
+WebServerLight.new(params).run
