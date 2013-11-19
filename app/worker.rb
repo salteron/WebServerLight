@@ -1,6 +1,7 @@
 # -*- encoding : utf-8 -*-
 require 'http_request_handler.rb'
-require 'resource_senders.rb'
+require 'http_response_generator.rb'
+require 'http_response_sender.rb'
 
 # Internal: осуществляет обработку клиентских запросов в отдельном потоке.
 # Воркер в цикле извлекает клиентские сокеты из очереди поступающих соединений,
@@ -11,6 +12,7 @@ require 'resource_senders.rb'
 # client_queue - указатель на очередь клиентских запросов, ожидающих обработки
 # settings     - hash параметров работы worker'а:
 #                :timeout - таймаут (секунды) ожидания данных запроса клиента
+#                :base_path - полный путь к папке, из которой раздаются файлы
 # idx          - число-идентификатор воркера
 #
 # Examples:
@@ -22,18 +24,15 @@ require 'resource_senders.rb'
 #  end
 #  # => 5 параллельно работающих воркера.
 class Worker
-  Request = Struct.new(:client, :resource, :file_path)
+  Request =  Struct.new(:client, :resource)
+  Response = Struct.new(:client, :status, :headers, :file_path)
 
   attr_reader :client_queue, :settings, :idx
-  attr_reader :request_handler, :resource_sender
 
   def initialize(client_queue, settings, idx)
     @client_queue    = client_queue
     @settings        = settings
     @idx             = idx
-
-    @request_handler = HTTPRequestHandler.new
-    @resource_sender = HTTPResourceSender.new
   end
 
   def work
@@ -41,8 +40,10 @@ class Worker
       begin
         client = @client_queue.pop
 
-        request = form_request client
-        @resource_sender.send_resource request
+        request  = generate_request  client
+        response = generate_response request
+
+        HTTPResponseSender.new.send_response response
       rescue Errno::EPIPE
         log 'client closed connection'
       rescue => e
@@ -55,25 +56,22 @@ class Worker
 
   private
 
-  def form_request(client)
-    request           = @request_handler.handle(client, @settings[:timeout])
-    request.file_path = resolve_resource_into_path request.resource
+  def generate_request(client)
+    request_handler = HTTPRequestHandler.new
+    request = request_handler.handle(client, @settings[:timeout])
 
-    log 'accepted request for file' \
-     " #{request.resource} (#{request.file_path})"
+    log "accepted request for resource #{request.resource}"
 
     request
   end
 
-  def resolve_resource_into_path(resource)
-    base_path = @settings[:base_path]
-    path      = File.expand_path File.join(base_path, resource)
+  def generate_response(request)
+    response_generator = HTTPResponseGenerator.new
+    response = response_generator.generate(request, @settings[:base_path])
 
-    if path.index(base_path) == 0 && File.file?(path) && File.exists?(path)
-      path
-    else
-      File.join(base_path, 'index.html')
-    end
+    log "formed response: #{response.status}: #{response.file_path}"
+
+    response
   end
 
   def log(message)
