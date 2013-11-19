@@ -11,11 +11,11 @@ class HTTPRequestHandler
       \/(?<uri>\S+)   # uri
     }xi
 
-  def handle(client, timeout)
-    lines = read client, timeout
+  def handle(client, settings)
+    lines = read client, settings[:timeout]
     uri   = extract_uri lines
 
-    Worker::Request.new(client, uri)
+    Worker::Request.new(client, uri, settings[:base_path])
   end
 
   private

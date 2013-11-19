@@ -11,7 +11,7 @@ class HTTPResponseSender
     end
 
     File.open(file, 'r') do |src|
-        response.client.write src.read(256) until src.eof?
+      response.client.write src.read(256) until src.eof?
     end
   end
 end

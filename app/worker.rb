@@ -24,7 +24,7 @@ require 'http_response_sender.rb'
 #  end
 #  # => 5 параллельно работающих воркера.
 class Worker
-  Request =  Struct.new(:client, :resource)
+  Request =  Struct.new(:client, :resource, :base_path)
   Response = Struct.new(:client, :status, :headers, :file_path)
 
   attr_reader :client_queue, :settings, :idx
@@ -48,8 +48,9 @@ class Worker
         log 'client closed connection'
       rescue => e
         log e.message
+        # send_500 client if client
       ensure
-        client.close
+        client.close if client
       end
     end
   end
@@ -58,7 +59,7 @@ class Worker
 
   def generate_request(client)
     request_handler = HTTPRequestHandler.new
-    request = request_handler.handle(client, @settings[:timeout])
+    request = request_handler.handle(client, @settings)
 
     log "accepted request for resource #{request.resource}"
 
@@ -67,7 +68,7 @@ class Worker
 
   def generate_response(request)
     response_generator = HTTPResponseGenerator.new
-    response = response_generator.generate(request, @settings[:base_path])
+    response = response_generator.generate(request)
 
     log "formed response: #{response.status}: #{response.file_path}"
 
@@ -75,8 +76,14 @@ class Worker
   end
 
   def log(message)
+    message = (message.to_s.strip.size != 0) ? message : 'unknown error!'
     message[0].downcase!
 
     puts "Worker##{@idx}: #{message}"
+  end
+
+  def send_500(client)
+    r_500 = HTTPResponseGenerator.new.generate_500(client)
+    HTTPResponseSender.new.send_response(r_500)
   end
 end

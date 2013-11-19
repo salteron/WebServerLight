@@ -1,8 +1,8 @@
 # -*- encoding : utf-8 -*-
 # TODO: send_file
 
-# Internal: набор методов формирования HTTP ответа, содержащего запрошенный
-# клиентом файл.
+# Internal: генератор HTTP-ответа по заданному запросу.
+#
 #
 # Examples:
 #
@@ -11,12 +11,19 @@
 #   r_sender.send_response request
 class HTTPResponseGenerator
 
-  def generate(request, base_path)
+  def generate(request)
     client    = request.client
-    file_path = resolve_resource_into_path base_path, request.resource
-    status    = resolve_status_code base_path, file_path
+    file_path = resolve_resource_into_path request.base_path, request.resource
+    status    = resolve_status_code request.base_path, file_path
     headers   = form_headers status, file_path
     
+    Worker::Response.new(client, status, headers, file_path)
+  end
+
+  def generate_500(client)
+    status    = '500 Internal Server Error'
+    file_path = ''
+    headers = form_headers(status, file_path)
     Worker::Response.new(client, status, headers, file_path)
   end
 
