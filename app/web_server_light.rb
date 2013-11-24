@@ -24,7 +24,6 @@ class WebServerLight
   DEFAULT_TIMEOUT   = 5
   DEFAULT_PORT      = 3000
 
-  attr_accessor :client_queue
   attr_reader   :server, :port, :settings
 
   def initialize(params)
@@ -35,43 +34,28 @@ class WebServerLight
     }
 
     @server       = TCPServer.open(@settings[:port])
-    @client_queue = Queue.new
 
     trap(:INT) { exit }
   end
 
   def run
-    init_workers
-    sockets = [@server]            # An array of sockets we'll monitor
+    worker_threads = run_workers
 
-    loop do
-      ready   = select(sockets)    # Wait for sockets to be ready
-      readable = ready[0]          # These sockets are readable
-
-      readable.each do |socket|
-        if socket == @server       # If the server socket is ready
-          client = @server.accept  # Accept a new client
-          sockets << client        # Add it to the set of sockets
-        else                       # Otherwise, a client is ready
-          sockets.delete(socket)   # Удаляем из общей очереди соединений
-          @client_queue << socket  # Пушим в очередь, просматриваемую воркерами
-        end
-      end
-    end
+    worker_threads.each(&:join)
   ensure
     @server.close if @server
   end
 
   private
 
-  def init_workers
+  def run_workers
     Thread.abort_on_exception = true
 
     threads = []
 
     NUM_OF_WORKERS.times do |i|
       threads << Thread.new(i) do |idx|
-        Worker.new(@client_queue, @settings, idx).work
+        Worker.new(@server, @settings, idx).work
       end
     end
 

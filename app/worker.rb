@@ -27,32 +27,47 @@ class Worker
   Request =  Struct.new(:client, :resource, :base_path)
   Response = Struct.new(:client, :status, :headers, :file_path)
 
-  attr_reader :client_queue, :settings, :idx
+  attr_reader :server, :settings, :idx
 
-  def initialize(client_queue, settings, idx)
-    @client_queue    = client_queue
-    @settings        = settings
-    @idx             = idx
+  def initialize(server, settings, idx)
+    @server   = server
+    @settings = settings
+    @idx      = idx
   end
 
   def work
+    r_sockets = [@server]
+    w_sockets = []
+
     loop do
-      begin
-        client = @client_queue.pop
+      ready    = IO.select(r_sockets, w_sockets)  # Wait for sockets to be ready
+      readable = ready[0]                         # These sockets are readable
+      writable = ready[1]                         # These sockets are writable
 
-        request  = generate_request  client
-        response = generate_response request
-
-        HTTPResponseSender.new.send_response response
-      rescue Errno::EPIPE
-        log 'client closed connection'
-      rescue => e
-        log e.message
-        # send_500 client if client
-      ensure
-        client.close if client
+      readable.each do |socket|
+        if socket == @server        # If the server socket is ready
+          client = @server.accept   # Accept a new client
+          r_sockets << client      # Add it to the set of sockets to read
+        else                        # Otherwise, a client is ready
+          r_sockets.delete(socket) # Удаляем из общей очереди соединений
+          serve_client(socket)
+        end
       end
     end
+  end
+
+  def serve_client(client)
+    request  = generate_request  client
+    response = generate_response request
+
+    HTTPResponseSender.new.send_response response
+  rescue Errno::EPIPE
+    log 'client closed connection'
+  rescue => e
+    log e.message
+    # send_500 client if client
+  ensure
+    client.close if client
   end
 
   private
