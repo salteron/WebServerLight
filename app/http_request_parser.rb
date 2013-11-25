@@ -1,43 +1,43 @@
 # -*- encoding : utf-8 -*-
 require 'timeout'
+require 'stringio'
 
 # Internal: набор методов для чтения из клиентского сокета и излвечения из
 # текста запроса идентификатора (uri) запрашиваемого файла (ресурса).
 # Медленные клиенты отсоединеняются по таймауту.
-class HTTPRequestHandler
+class HTTPRequestParser
   HTTP_REQUEST_LINE_REGEXP = %r{
       ^GET            # http method
       \s+             # whitespaces
       \/(?<uri>\S+)   # uri
     }xi
 
-  def handle(client, settings)
-    lines = read client, settings[:timeout]
+    INDEX_PATH = 'index.html'
+
+  def parse_uri(client, input, base_path)
+    lines = parse_input input
     uri   = extract_uri lines
 
-    Worker::Request.new(client, uri, settings[:base_path])
+    Worker::Request.new(client, uri, base_path)
   end
 
   private
 
-  def read(client, timeout)
+  def parse_input(input)
     lines = []
+    sio = StringIO.new(input)
 
-    Timeout.timeout(timeout) do
-      while (line = client.gets) && line !~ /^\s*$/
-        lines << line.chomp
-      end
+    while (line = sio.gets)
+      lines << line.chomp
     end
 
     lines
-  rescue Timeout::Error
-    raise 'slow client rejected'
   end
 
   def extract_uri(lines)
     request_line = lines[0]
 
     match = HTTP_REQUEST_LINE_REGEXP.match(request_line)
-    match ? match[:uri] : 'index.html'
+    match ? match[:uri] : INDEX_PATH
   end
 end

@@ -1,7 +1,8 @@
 # -*- encoding : utf-8 -*-
-require 'http_request_handler.rb'
+require 'http_request_parser.rb'
 require 'http_response_generator.rb'
 require 'http_response_sender.rb'
+require 'client_reader.rb'
 
 # Internal: осуществляет обработку клиентских запросов в отдельном потоке.
 # Воркер в цикле извлекает клиентские сокеты из очереди поступающих соединений,
@@ -28,18 +29,25 @@ class Worker
   Response = Struct.new(:client, :status, :headers, :file_path)
 
   attr_reader :server, :settings, :idx
+  attr_accessor :r_sockets, :w_sockets
 
   def initialize(server, settings, idx)
     @server   = server
     @settings = settings
     @idx      = idx
+
+    @r_sockets = [@server]
+    @w_sockets = []
+
+    @client_readers = []
+    @client_writers = []
   end
 
   def work
-    r_sockets = [@server]
-    w_sockets = []
-
     loop do
+      r_sockets = [@server].concat @client_readers.map(&:client_socket)
+      w_sockets = @client_writers.map(&:client_socket)
+
       ready    = IO.select(r_sockets, w_sockets)  # Wait for sockets to be ready
       readable = ready[0]                         # These sockets are readable
       writable = ready[1]                         # These sockets are writable
@@ -47,17 +55,34 @@ class Worker
       readable.each do |socket|
         if socket == @server        # If the server socket is ready
           client = @server.accept   # Accept a new client
-          r_sockets << client      # Add it to the set of sockets to read
+          @client_readers << ClientReader.new(client)
         else                        # Otherwise, a client is ready
-          r_sockets.delete(socket) # Удаляем из общей очереди соединений
-          serve_client(socket)
+          cr = @client_readers.select{ |cr| cr.client_socket == socket }.first
+          read_from_client cr
         end
       end
     end
   end
 
-  def serve_client(client)
-    request  = generate_request  client
+  def read_from_client(client_reader)
+    client_reader.read
+
+    if client_reader.done?
+      if client_reader.terminated?
+        @client_readers.delete(client_reader)
+        serve_client(client_reader.client_socket, client_reader.result)
+      else
+        # давай досвидания (буфер переполнен). удалить из чит очереди
+        @client_readers.delete(client_reader)
+        client_reader.client_socket.close
+      end
+    end
+  rescue Errno::EPIPE
+    log 'client closed connection'
+  end
+
+  def serve_client(client, input)
+    request  = generate_request  client, input
     response = generate_response request
 
     HTTPResponseSender.new.send_response response
@@ -72,9 +97,9 @@ class Worker
 
   private
 
-  def generate_request(client)
-    request_handler = HTTPRequestHandler.new
-    request = request_handler.handle(client, @settings)
+  def generate_request(client, input)
+    request_handler = HTTPRequestParser.new
+    request = request_handler.parse_uri(client, input, @settings[:base_path])
 
     log "accepted request for resource #{request.resource}"
 
