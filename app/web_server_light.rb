@@ -27,8 +27,9 @@ class WebServerLight
   attr_reader   :server, :port, :settings
 
   def initialize(params)
+    $base_path    = define_base_path(params[:base_path]).strip
+
     @settings     = {
-      base_path: define_base_path(params[:base_path]),
       timeout:   params.fetch(:timeout, DEFAULT_TIMEOUT),
       port:      params.fetch(:port, DEFAULT_PORT)
     }

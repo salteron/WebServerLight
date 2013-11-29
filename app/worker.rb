@@ -1,8 +1,6 @@
 # -*- encoding : utf-8 -*-
-require 'http_request_parser.rb'
-require 'http_response_generator.rb'
-require 'http_response_sender.rb'
-require 'client_reader.rb'
+require 'http_response_generator'
+require 'request'
 
 # Internal: осуществляет обработку клиентских запросов в отдельном потоке.
 # Воркер в цикле извлекает клиентские сокеты из очереди поступающих соединений,
@@ -25,94 +23,73 @@ require 'client_reader.rb'
 #  end
 #  # => 5 параллельно работающих воркера.
 class Worker
-  Request =  Struct.new(:client, :resource, :base_path)
-  Response = Struct.new(:client, :status, :headers, :file_path)
-
-  attr_reader :server, :settings, :idx
-  attr_accessor :r_sockets, :w_sockets
+  attr_reader :idx, :requests, :responses
 
   def initialize(server, settings, idx)
     @server   = server
     @settings = settings
     @idx      = idx
 
-    @r_sockets = [@server]
-    @w_sockets = []
-
-    @client_readers = []
-    @client_writers = []
+    @requests  = []
+    @responses = []
   end
 
   def work
     loop do
-      r_sockets = [@server].concat @client_readers.map(&:client_socket)
-      w_sockets = @client_writers.map(&:client_socket)
+      r_sockets = [@server].concat @requests.map(&:client_socket)
+      w_sockets = @responses.map(&:client_socket)
 
       ready    = IO.select(r_sockets, w_sockets)  # Wait for sockets to be ready
       readable = ready[0]                         # These sockets are readable
       writable = ready[1]                         # These sockets are writable
 
       readable.each do |socket|
-        if socket == @server        # If the server socket is ready
-          client = @server.accept   # Accept a new client
-          @client_readers << ClientReader.new(client)
-        else                        # Otherwise, a client is ready
-          cr = @client_readers.select{ |cr| cr.client_socket == socket }.first
-          read_from_client cr
+        if socket == @server
+          client_socket = @server.accept
+          @requests << Request.new(client_socket)
+          log "accepted new connection"
+        else
+          r = @requests.select{ |r| r.client_socket == socket }.first
+          handle_request r
         end
       end
-    end
-  end
 
-  def read_from_client(client_reader)
-    client_reader.read
-
-    if client_reader.done?
-      if client_reader.terminated?
-        @client_readers.delete(client_reader)
-        serve_client(client_reader.client_socket, client_reader.result)
-      else
-        # давай досвидания (буфер переполнен). удалить из чит очереди
-        @client_readers.delete(client_reader)
-        client_reader.client_socket.close
+      writable.each do |socket|
+        r = @responses.select{ |r| r.client_socket == socket }.first
+        handle_response r
       end
     end
-  rescue Errno::EPIPE
-    log 'client closed connection'
   end
 
-  def serve_client(client, input)
-    request  = generate_request  client, input
-    response = generate_response request
+  def handle_request(request)
+    request.read
+    log 'reading from request'
+    if request.read?
+      @requests.delete(request)
 
-    HTTPResponseSender.new.send_response response
-  rescue Errno::EPIPE
-    log 'client closed connection'
-  rescue => e
-    log e.message
-    # send_500 client if client
-  ensure
-    client.close if client
+      if request.valid?
+        response = HTTPResponseGenerator.new.generate_from_uri(
+          request.uri,
+          request.client_socket
+        )
+
+        @responses << response
+        log "request for #{request.uri.inspect} generated"
+      else
+        log "closing invalid request"
+        request.close
+      end
+    end
   end
 
-  private
+  def handle_response(response)
+    response.write
+    log "writing response (#{response})"
+    return unless response.written?
 
-  def generate_request(client, input)
-    request_handler = HTTPRequestParser.new
-    request = request_handler.parse_uri(client, input, @settings[:base_path])
-
-    log "accepted request for resource #{request.resource}"
-
-    request
-  end
-
-  def generate_response(request)
-    response_generator = HTTPResponseGenerator.new
-    response = response_generator.generate(request)
-
-    log "formed response: #{response.status}: #{response.file_path}"
-
-    response
+    log "response closed"
+    @responses.delete(response)
+    response.close
   end
 
   def log(message)
