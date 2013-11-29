@@ -1,9 +1,7 @@
-class HTTPStatus500
-  def code
-    500
-  end
+require 'http_statuses/http_status'
 
-  def full_code
-    '500 Internal Server Error'
+class HTTPStatus500 < HTTPStatus
+  def initialize
+    super(500, '500 Internal Server Error')
   end
 end

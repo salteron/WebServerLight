@@ -1,9 +1,7 @@
-class HTTPStatus403
-  def code
-    403
-  end
+require 'http_statuses/http_status'
 
-  def full_code
-    '403 Forbidden'
+class HTTPStatus403 < HTTPStatus
+  def initialize
+    super(403, '403 Forbidden')
   end
 end

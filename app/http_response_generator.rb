@@ -19,12 +19,14 @@ class HTTPResponseGenerator
     path      = resolve_resource_into_path(uri)
     status    = resolve_status_code(path)
 
-    generate_from_status(status, client_socket, path)
+    file_path = status.is_a?(HTTPStatus200) ? path : status.template
+
+    generate_from_status(status, client_socket, file_path)
   end
 
-  def generate_from_status(status, client_socket, path = index_path)
-    head = form_head(status, path)
-    body = form_body(status, path)
+  def generate_from_status(status, client_socket, file_path = status.template)
+    head = form_head(status, file_path)
+    body = file_path
 
     Response.new(client_socket, head, body)
   end
@@ -32,11 +34,10 @@ class HTTPResponseGenerator
   private
 
   def resolve_resource_into_path(resource)
-    case
-    when resource.empty?
+    if resource.empty?
       index_path
     else
-      File.expand_path(File.join($base_path, resource)).strip
+      File.expand_path(File.join(AppData.public_path, resource)).strip
     end
   end
 
@@ -53,7 +54,7 @@ class HTTPResponseGenerator
   end
 
   def permitted?(file_path)
-    file_path.index($base_path).zero?
+    file_path.index(AppData.public_path).zero?
   end
 
   def form_head(status, file_path)
@@ -82,17 +83,9 @@ class HTTPResponseGenerator
     headers.join("\r\n")
   end
 
-  def form_body(status, file_path)
-    if status.is_a?(HTTPStatus200)
-      file_path
-    else
-      "html/#{status.code}.html"
-    end
-  end
-
   def define_content_type(path)
     ext = File.extname(path)
-    return 'text/html'  if ext == '.html' || ext == '.htm'
+    return 'text/html'  if ext == '.html' || ext == '.htm' || ext == '.erb'
     return 'text/plain' if ext == '.txt'
     return 'text/css'   if ext == '.css'
     return 'image/jpeg' if ext == '.jpeg' || ext == '.jpg'
@@ -107,6 +100,6 @@ class HTTPResponseGenerator
   end
 
   def index_path
-    File.join($base_path, 'index.html')
+    File.join(AppData.public_path, 'index.html')
   end
 end

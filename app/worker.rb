@@ -1,6 +1,7 @@
 # -*- encoding : utf-8 -*-
-require 'http_response_generator'
 require 'request'
+require 'http_response_generator'
+require 'colorize'
 
 # Internal: осуществляет обработку клиентских запросов в отдельном потоке.
 # Воркер в цикле извлекает клиентские сокеты из очереди поступающих соединений,
@@ -11,7 +12,7 @@ require 'request'
 # client_queue - указатель на очередь клиентских запросов, ожидающих обработки
 # settings     - hash параметров работы worker'а:
 #                :timeout - таймаут (секунды) ожидания данных запроса клиента
-#                :base_path - полный путь к папке, из которой раздаются файлы
+#                :public_path - полный путь к папке, из которой раздаются файлы
 # idx          - число-идентификатор воркера
 #
 # Examples:
@@ -25,9 +26,8 @@ require 'request'
 class Worker
   attr_reader :idx, :requests, :responses
 
-  def initialize(server, settings, idx)
+  def initialize(server, idx)
     @server   = server
-    @settings = settings
     @idx      = idx
 
     @requests  = []
@@ -46,8 +46,7 @@ class Worker
       readable.each do |socket|
         if socket == @server
           client_socket = @server.accept
-          @requests << Request.new(client_socket)
-          log "accepted new connection"
+          push_request(Request.new(client_socket))
         else
           r = @requests.select{ |r| r.client_socket == socket }.first
           handle_request r
@@ -61,9 +60,48 @@ class Worker
     end
   end
 
+  private
+
+  def push_request(request)
+    get_rid_of_stale if conn_limit_reached?
+
+    if conn_limit_reached?  # still
+      log "rejected new #{request}", 'red'
+    else
+      @requests << request
+      log "accepted new #{request}", 'green'
+    end
+  end
+
+  def conn_limit_reached?
+    (@requests.size + @responses.size) == AppData.max_connections
+  end
+
+  def get_rid_of_stale
+    stales_count = 0
+
+    [@requests, @responses].each do |queue|
+      before_count = queue.size
+
+      stales = queue.select { |r| r.stale? }
+      stales.each do |r|
+        r.close
+        queue.delete(r)
+      end
+
+      stales_count += before_count - queue.size
+
+    end
+
+    unless stales_count.zero?
+      log("got rid of #{stales_count} stale(s)", 'yellow')
+    end
+  end
+
   def handle_request(request)
+    # log "reading from #{request}"
     request.read
-    log 'reading from request'
+
     if request.read?
       @requests.delete(request)
 
@@ -74,33 +112,31 @@ class Worker
         )
 
         @responses << response
-        log "request for #{request.uri.inspect} generated"
+        log "uri resolved: #{request.uri.inspect} (#{request})", 'green'
       else
-        log "closing invalid request"
+        log "closing invalid #{request}", 'red'
         request.close
       end
     end
   end
 
   def handle_response(response)
+    # log "writing #{response}"
     response.write
-    log "writing response (#{response})"
     return unless response.written?
 
-    log "response closed"
+    log "transferred", 'green'
     @responses.delete(response)
     response.close
   end
 
-  def log(message)
+  def log(message, color = nil)
     message = (message.to_s.strip.size != 0) ? message : 'unknown error!'
     message[0].downcase!
 
-    puts "Worker##{@idx}: #{message}"
-  end
+    log_msg = "Worker##{@idx}: #{message}"
+    log_msg = log_msg.send(color) if color
 
-  def send_500(client)
-    r_500 = HTTPResponseGenerator.new.generate_500(client)
-    HTTPResponseSender.new.send_response(r_500)
+    puts log_msg
   end
 end

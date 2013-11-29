@@ -1,9 +1,11 @@
-class HTTPStatus200
-  def code
-    200
+require 'http_statuses/http_status'
+
+class HTTPStatus200 < HTTPStatus
+  def initialize
+    super(200, '200 OK')
   end
 
-  def full_code
-    '200 OK'
+  def template
+    nil
   end
 end

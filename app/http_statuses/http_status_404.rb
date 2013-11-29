@@ -1,9 +1,7 @@
-class HTTPStatus404
-  def code
-    404
-  end
+require 'http_statuses/http_status'
 
-  def full_code
-    '404 Not Found'
+class HTTPStatus404 < HTTPStatus
+  def initialize
+    super(404, '404 Not Found')
   end
 end

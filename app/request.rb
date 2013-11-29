@@ -13,6 +13,8 @@ class Request
       INPUT_LIMIT,
       INPUT_TERMINATOR
     )
+
+    @birth_time = Time.now
   end
 
   def client_socket
@@ -37,6 +39,10 @@ class Request
 
   def close
     @socket_reader.close_connection
+  end
+
+  def stale?
+    (Time.now - @birth_time) > AppData.request_max_service
   end
 
   private

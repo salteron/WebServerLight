@@ -7,7 +7,7 @@ require 'stringio'
 class SocketWriter
   BYTES_TO_SEND_AT_ONCE = 1024
 
-  attr_reader :client_socket
+  attr_reader :client_socket, :last_activity
 
   def initialize(client_socket, ios)
     @client_socket     =  client_socket
@@ -18,12 +18,10 @@ class SocketWriter
 
     @client_socket.sync = true
     @connection_closed  = false
+
+    update_activity
   end
 
-  # пишем, если
-  #   не все написали
-  #   клиент не закрыл соединение
-  # обязательно повторяем, если клиент прочитал буфер полностью
   def write
     ready = true                          # изначально клиент готов
     while ready && !enough?               # клиент готов и мы не все отдали
@@ -32,12 +30,13 @@ class SocketWriter
       sub_bytes_sent = @client_socket.write_nonblock(buffer)
       @bytes_sent +=  sub_bytes_sent
 
-      ready = (sub_bytes_sent == buffer.length)  # клиент захавал весь буфер?
+      ready = (sub_bytes_sent == buffer.length) # клиент захавал весь буфер?
                                                # если да, то наверное готов еще
-      switch_to_next_io if current_io_done?    # след файл, если этот закончился
+      switch_to_next_io if current_io_done?   # след файл, если этот закончился
+
+      update_activity
     end
-  rescue IO::WaitWritable
-    # If we can't write even a byte.
+  rescue IO::WaitWritable  # If we can't write even a byte.
     # Should never happen cuz socket is supposed to be writable.
   rescue Errno::EPIPE, Errno::ECONNRESET
     @connection_closed = true
@@ -50,16 +49,20 @@ class SocketWriter
   def close
     # I/O streams are automatically closed when they are claimed by the garbage
     # collector.
-    #unless @connection_closed
+    unless @connection_closed
       @client_socket.close
       @connection_closed = true
-    #end
+    end
 
     @ios.each { |io| io.close unless io.closed? }
   end
 
   def success?
     @ios_sent == @ios.length
+  end
+
+  def update_activity
+    @last_activity = Time.now
   end
 
   private
@@ -70,7 +73,7 @@ class SocketWriter
 
   def current_io_done?
     done = @bytes_sent == current_io.size
-    raise if done && !current_io.eof?  # debugging
+    fail if done && !current_io.eof?  # debugging
     done
   end
 
