@@ -1,6 +1,6 @@
 WebServerLight
 ==============
 
-ruby app/run.rb
+ruby run.rb
 
-settings: app/config.rb
+settings: config/config.rb
