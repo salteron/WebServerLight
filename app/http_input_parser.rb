@@ -7,12 +7,11 @@ class HTTPInputParser
       \/(?<uri>\S*)   # uri
     }xi
 
-
   # returns uri if input contains vaid request line
   # nil otherwise
   def parse_uri(input)
     lines = parse_input input
-    uri   = extract_uri lines
+    extract_uri lines
   end
 
   private

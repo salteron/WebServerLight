@@ -1,10 +1,35 @@
+# -*- encoding : utf-8 -*-
+
+require 'forwardable'
 require 'stringio'
 require 'socket_writer'
 require 'erb'
+require 'stats_collector'
+require 'exceptions/http_500_exception'
 
+
+# Объект, представляющих состояние ответа на клиентский запрос.
+#
+# Ответ может быть записываемым или записанным.
+#   Записываемый ответ может быть 'протухшим' или нет.
+#   Записанный ответ - либо все данные переданы клиенту, либо клиент разорвал
+#     соединение.
+#
+# Делегирует запись в клиентский сокет связанному с собой объекту типа
+# SocketWriter.
 class Response
-  def initialize(client_socket, head, body)
-    ios = [StringIO.new(head), body_to_io(body)]
+  extend Forwardable
+
+  attr_reader :body, :status
+
+  def_delegators :@socket_writer, :write, :client_socket, :success?
+  def_delegators :@socket_writer, :close_ios, :close
+  def_delegator  :@socket_writer, :enough?, :written?
+
+  def initialize(client_socket, status, head, body)
+    ios     = [StringIO.new(head), body_to_io(body)]
+    @body   = body
+    @status = status
 
     @socket_writer = SocketWriter.new(
       client_socket,
@@ -12,26 +37,8 @@ class Response
     )
   end
 
-  def client_socket
-    @socket_writer.client_socket
-  end
-
-  def write
-    @socket_writer.write
-  end
-
-  def written?
-    @socket_writer.enough?
-  end
-
-  def success?
-    @socket_writer.success?
-  end
-
-  def close
-    @socket_writer.close
-  end
-
+  # Ответ считается 'протухшим', если с момента последнего чтения клиента
+  # прошло больше response_max_idle секунд.
   def stale?
     (Time.now - @socket_writer.last_activity) > AppData.response_max_idle
   end
@@ -40,9 +47,15 @@ class Response
 
   def body_to_io(file_path)
     if File.extname(file_path) == '.erb'
-      StringIO.new ERB.new(File.read(file_path)).result
+      erb_to_io(file_path)
     else
       File.open(file_path)
     end
+  end
+
+  def erb_to_io(file_path)
+    StringIO.new ERB.new(File.read(file_path)).result
+  rescue
+    raise HTTP500Exception
   end
 end

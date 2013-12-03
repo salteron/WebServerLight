@@ -1,3 +1,5 @@
+# -*- encoding : utf-8 -*-
+
 require 'http_statuses/http_status'
 
 class HTTPStatus200 < HTTPStatus
@@ -6,6 +8,6 @@ class HTTPStatus200 < HTTPStatus
   end
 
   def template
-    nil
+    ''
   end
 end

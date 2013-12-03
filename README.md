@@ -1,4 +1,6 @@
 WebServerLight
 ==============
 
-ruby app/run.rb [public_path]
+ruby app/run.rb
+
+settings: app/config.rb

@@ -1,9 +1,11 @@
+# -*- encoding : utf-8 -*-
+
 require 'stringio'
 
-# Writes portions of the given file to client socket
+# Writes portions of given ios to client socket
 #
 # client_socket  -  socket to non-block write to;
-# file_path      -  path of the file to write from.
+# ios            -  set of io objects to write from.
 class SocketWriter
   BYTES_TO_SEND_AT_ONCE = 1024
 
@@ -23,9 +25,9 @@ class SocketWriter
   end
 
   def write
-    ready = true                          # изначально клиент готов
-    while ready && !enough?               # клиент готов и мы не все отдали
-      buffer = read_portion_from_io       # читаем из io кусок predef размера
+    ready = true                      # изначально клиент готов (т.к. select)
+    while ready && !enough?           # клиент готов и мы не все отдали
+      buffer = read_portion_from_io   # читаем из io кусок predef размера
 
       sub_bytes_sent = @client_socket.write_nonblock(buffer)
       @bytes_sent +=  sub_bytes_sent
@@ -47,13 +49,20 @@ class SocketWriter
   end
 
   def close
+    close_connections
+    close_ios
+  end
+
+  def close_connections
     # I/O streams are automatically closed when they are claimed by the garbage
     # collector.
     unless @connection_closed
       @client_socket.close
       @connection_closed = true
     end
+  end
 
+  def close_ios
     @ios.each { |io| io.close unless io.closed? }
   end
 
@@ -61,20 +70,19 @@ class SocketWriter
     @ios_sent == @ios.length
   end
 
+  private
+
   def update_activity
     @last_activity = Time.now
   end
 
-  private
 
   def current_io
     @ios[@ios_sent]
   end
 
   def current_io_done?
-    done = @bytes_sent == current_io.size
-    fail if done && !current_io.eof?  # debugging
-    done
+    @bytes_sent == current_io.size
   end
 
   def switch_to_next_io
@@ -84,7 +92,7 @@ class SocketWriter
     @ios_sent  += 1
   end
 
-  # name. length. offset
+  # move to offset. then read portion
   def read_portion_from_io
     current_io.seek(@bytes_sent, IO::SEEK_SET)
     current_io.read(BYTES_TO_SEND_AT_ONCE)

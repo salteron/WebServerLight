@@ -1,3 +1,5 @@
+# -*- encoding : utf-8 -*-
+
 module AppData
   # we don't want to instantiate this class - it's a singleton,
   # so just keep it as a self-extended module
@@ -26,5 +28,4 @@ module AppData
   def config(&block)
     instance_eval &block
   end
-
 end

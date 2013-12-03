@@ -3,22 +3,22 @@ require 'socket'
 require 'thread'
 require 'worker'
 require 'config'
-
+require 'stats_collector'
 
 # Public: класс для создания экземпляров веб-сервера.
 # WebServerLight = легковесный многопоточный веб-сервер.
 #
-# params - Hash параметров работы веб-сервера:
-#          :public_path - строка, полный путь в системе, откуда будут раздаваться
-#                       файлы (необязательный) (default: project_dir/public)
-#          :port - номер порта, на который сервер принимает соединение
-#                  (необязательный) (default: DEFAULT_PORT)
-#          :timeout - таймаут (в секундах) для отключения медленных клиентов
-#                     (необязательный) (default: DEFAULT_TIMEOUT)
+# Отвечает за создание принимающего клиентские соединения сокета,
+# инициализацию Worker'ов и разделяемых ими ресурсов.
+#
+# config.rb
+#  num_of_workers  - количество создаваемых воркеров;
+#  port            - порт, на который принимаются соединения;
+#  public_path     - путь, по которому находятся ресурсы веб-сервера.
 #
 # Examples
 #
-#   server = WebServerLight.new(port: 5000, public_path: ~/public)
+#   server = WebServerLight.new
 #   server.run
 class WebServerLight
 
@@ -40,12 +40,13 @@ class WebServerLight
 
   def run_workers
     Thread.abort_on_exception = true
+    stats_collector = StatsCollector.new
 
     threads = []
 
     AppData.num_of_workers.times do |i|
       threads << Thread.new(i) do |idx|
-        Worker.new(@server, idx).work
+        Worker.new(@server, idx, stats_collector).work
       end
     end
 

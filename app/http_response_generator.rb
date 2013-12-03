@@ -22,20 +22,31 @@ class HTTPResponseGenerator
     file_path = status.is_a?(HTTPStatus200) ? path : status.template
 
     generate_from_status(status, client_socket, file_path)
+  rescue HTTP500Exception
+    g_500(client_socket)
   end
 
   def generate_from_status(status, client_socket, file_path = status.template)
     head = form_head(status, file_path)
     body = file_path
 
-    Response.new(client_socket, head, body)
+    Response.new(client_socket, status, head, body)
+  end
+
+  def g_500(client_socket)
+    generate_from_status(HTTPStatus500.new, client_socket)
   end
 
   private
 
   def resolve_resource_into_path(resource)
-    if resource.empty?
+    case
+    when resource.empty?
       index_path
+    when resource == 'stats'
+      stats_path
+    when resource == 'favicon.ico'
+      favicon_path
     else
       File.expand_path(File.join(AppData.public_path, resource)).strip
     end
@@ -54,7 +65,7 @@ class HTTPResponseGenerator
   end
 
   def permitted?(file_path)
-    file_path.index(AppData.public_path).zero?
+    service_paths.include?(file_path) || file_path.index(AppData.public_path).zero?
   end
 
   def form_head(status, file_path)
@@ -99,7 +110,19 @@ class HTTPResponseGenerator
     'text/html'
   end
 
+  def service_paths
+    [index_path, stats_path, favicon_path]
+  end
+
   def index_path
-    File.join(AppData.public_path, 'index.html')
+    File.join(AppData.templates_path, 'index.html.erb')
+  end
+
+  def stats_path
+    index_path
+  end
+
+  def favicon_path
+    File.join(AppData.templates_path, 'favicon.ico')
   end
 end

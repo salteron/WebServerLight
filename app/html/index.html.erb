@@ -1,0 +1,27 @@
+<html>
+<head>
+</head>
+<body>
+  <%
+    def list_tree(dir, out = '')
+      out << "#{File.basename(dir)}<ul>"
+      Dir.foreach(dir) do |item|
+        next if item == '.' || item == '..'
+        item_path = File.join(dir, item)
+        if File.file?(item_path)
+          item_path.slice!(AppData.public_path)
+          file_path = File.join(dir, item)
+          out << "<li><a href='#{item_path}'>#{item} (#{StatsCollector.stats[file_path] || 0})</a></li>"
+        else
+          list_tree(item_path, out)
+        end
+      end
+      out << '</ul>'
+    end
+  %>
+
+  <ul>
+    <%= list_tree AppData.public_path %>
+  </ul>
+</body>
+</html>

@@ -1,3 +1,5 @@
+# -*- encoding : utf-8 -*-
+
 require 'app_data'
 
 DEFAULT_PUBLIC_PATH = File.expand_path("#{File.dirname(__FILE__)}/../public")
@@ -11,13 +13,18 @@ AppData.config do
 
   #######################
 
-  num_of_workers        1
-  port                  3000
-  public_path           DEFAULT_PUBLIC_PATH
-  templates_path        File.expand_path('html')
+  num_of_workers       5
+  port                 3000
+  public_path          DEFAULT_PUBLIC_PATH # путь до места хранения
+                                           # раздаваемых файлов
 
-  request_max_service   10  # seconds
-  response_max_idle     1   # seconds
+  templates_path       File.expand_path('html') # путь до шаблонов:
+                                                # шаблоны статусов, index
 
-  max_connections       2   # per worker
+  request_max_service  2   # предел времени ожидания запроса от клиента
+  response_max_idle    1   # таймаут бездействия клиента во время передачи ответа
+
+  max_connections      2   # максимальное число клиентов, обрабатываемых
+                           # конкурентно воркером; при достижении лимита,
+                           # воркер отвергает новых клиентов.
 end

@@ -1,3 +1,5 @@
+# -*- encoding : utf-8 -*-
+
 require 'http_statuses/http_status'
 
 class HTTPStatus403 < HTTPStatus
