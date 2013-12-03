@@ -68,6 +68,7 @@ class Worker
   def push_request(request)
     if conn_limit_reached?
       log "rejected new #{request.client_socket}", 'red'
+      request.close
     else
       @requests << request
       log "accepted new #{request.client_socket}"
