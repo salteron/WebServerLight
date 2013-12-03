@@ -1,13 +1,13 @@
 # -*- encoding : utf-8 -*-
 
-require 'http_statuses/http_status'
+module WebServerLight
+  class HTTPStatus::HTTPStatus200 < HTTPStatus
+    def initialize
+      super(200, '200 OK')
+    end
 
-class HTTPStatus200 < HTTPStatus
-  def initialize
-    super(200, '200 OK')
-  end
-
-  def template
-    ''
+    def template
+      ''
+    end
   end
 end

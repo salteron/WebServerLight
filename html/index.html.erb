@@ -9,9 +9,9 @@
         next if item == '.' || item == '..'
         item_path = File.join(dir, item)
         if File.file?(item_path)
-          item_path.slice!(AppData.public_path)
+          item_path.slice!(WebServerLight::Config::AppData.public_path)
           file_path = File.join(dir, item)
-          out << "<li><a href='#{item_path}'>#{item} (#{StatsCollector.stats[file_path] || 0})</a></li>"
+          out << "<li><a href='#{item_path}'>#{item} (#{WebServerLight::Tools::StatsCollector.stats[file_path] || 0})</a></li>"
         else
           list_tree(item_path, out)
         end
@@ -21,7 +21,7 @@
   %>
 
   <ul>
-    <%= list_tree AppData.public_path %>
+    <%= list_tree WebServerLight::Config::AppData.public_path %>
   </ul>
 </body>
 </html>

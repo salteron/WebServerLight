@@ -1,10 +1,10 @@
 # -*- encoding : utf-8 -*-
 
-require 'app_data'
+require 'config/app_data'
 
 DEFAULT_PUBLIC_PATH = File.expand_path("#{File.dirname(__FILE__)}/../public")
 
-AppData.config do
+WebServerLight::Config::AppData.config do
   param :num_of_workers, :port
   param :public_path, :templates_path
 

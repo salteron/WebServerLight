@@ -1,4 +1,8 @@
 # -*- encoding : utf-8 -*-
 
-class HTTP500Exception < Exception
+module WebServerLight
+  module Exceptions
+    class HTTP500Exception < Exception
+    end
+  end
 end

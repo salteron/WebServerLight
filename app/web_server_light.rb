@@ -1,11 +1,10 @@
 # -*- encoding : utf-8 -*-
 require 'socket'
 require 'thread'
-require 'worker'
-require 'config'
-require 'stats_collector'
+require 'config/config'
+require 'app/worker'
+require 'app/tools/stats_collector'
 
-# Public: класс для создания экземпляров веб-сервера.
 # WebServerLight = легковесный многопоточный веб-сервер.
 #
 # Отвечает за создание принимающего клиентские соединения сокета,
@@ -20,15 +19,13 @@ require 'stats_collector'
 #
 #   server = WebServerLight.new
 #   server.run
-class WebServerLight
-
-  def initialize
-    @server = TCPServer.open(AppData.port)
-
-    trap(:INT) { exit }
-  end
+module WebServerLight
+  extend self
 
   def run
+    trap(:INT) { exit }
+    @server = TCPServer.open(Config::AppData.port)
+
     worker_threads = run_workers
 
     worker_threads.each(&:join)
@@ -40,11 +37,11 @@ class WebServerLight
 
   def run_workers
     Thread.abort_on_exception = true
-    stats_collector = StatsCollector.new
+    stats_collector = Tools::StatsCollector.new
 
     threads = []
 
-    AppData.num_of_workers.times do |i|
+    Config::AppData.num_of_workers.times do |i|
       threads << Thread.new(i) do |idx|
         Worker.new(@server, idx, stats_collector).work
       end

@@ -1,9 +1,9 @@
 # -*- encoding : utf-8 -*-
 
-require 'http_statuses/http_status'
-
-class HTTPStatus404 < HTTPStatus
-  def initialize
-    super(404, '404 Not Found')
+module WebServerLight
+  class HTTPStatus::HTTPStatus404 < HTTPStatus
+    def initialize
+      super(404, '404 Not Found')
+    end
   end
 end
