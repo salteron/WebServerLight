@@ -19,7 +19,6 @@ module WebServerLight
         @bytes_sent        = 0
 
         @client_socket.sync = true
-        @connection_closed  = false
 
         update_activity
       end
@@ -41,11 +40,11 @@ module WebServerLight
       rescue IO::WaitWritable  # If we can't write even a byte.
         # Should never happen cuz socket is supposed to be writable.
       rescue Errno::EPIPE, Errno::ECONNRESET
-        @connection_closed = true
+        # client closed connection while reading
       end
 
       def enough?
-        success? || @connection_closed
+        success? || @client_socket.closed?
       end
 
       def close
@@ -56,10 +55,7 @@ module WebServerLight
       def close_connections
         # I/O streams are automatically closed when they are claimed by the garbage
         # collector.
-        unless @connection_closed
-          @client_socket.close
-          @connection_closed = true
-        end
+        @client_socket.close unless @client_socket.closed?
       end
 
       def close_ios

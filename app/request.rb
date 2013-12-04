@@ -47,7 +47,8 @@ module WebServerLight
     def valid?
       parse(@socket_reader.input) if read?
 
-      !(uri.nil? || uri == 'favicon.ico')  # chrome bug stubbing
+      # !(uri.nil? || uri == 'favicon.ico')  # chrome bug stubbing
+      !uri.nil?
     end
 
     def close

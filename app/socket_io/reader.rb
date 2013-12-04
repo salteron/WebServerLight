@@ -21,7 +21,6 @@ module WebServerLight
         @input_limit       = input_limit
         @input_terminator  = input_terminator
         @input             = ''
-        @connection_closed = false
       end
 
       # Читает из сокета ровно столько, сколько сокет готов передать.
@@ -32,20 +31,17 @@ module WebServerLight
       rescue IO::WaitReadable
         # client is not ready to write as much as promissed? Unlikely
       rescue Errno::EPIPE
-        @connection_closed = true
+        # client closed connection while writing
       end
 
       def enough?
-        success? || buffer_overlimited? || @connection_closed
+        success? || buffer_overlimited? || @client_socket.closed?
       end
 
       def close_connection
         # I/O streams are automatically closed when they are claimed by the garbage
         # collector.
-        unless @connection_closed
-          @client_socket.close
-          @connection_closed = true
-        end
+        @client_socket.close unless @client_socket.closed?
       end
 
       private
