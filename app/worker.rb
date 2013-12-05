@@ -41,9 +41,14 @@ module WebServerLight
         r_sockets = [@server].concat @requests.map(&:client_socket)
         w_sockets = @responses.map(&:client_socket)
 
-        ready    = IO.select(r_sockets, w_sockets) # Wait for sockets to be ready
-        readable = ready[0]                        # These sockets are readable
-        writable = ready[1]                        # These sockets are writable
+        ready     = IO.select(r_sockets, w_sockets) # Wait for sockets to be ready
+
+        get_rid_of_stale  # select мог продлиться долго - проверяем очереди
+                          # @requests & @responses на наличие протухших
+                          # клиентов
+
+        readable = ready[0].select { |s| @requests.map(&:client_socket).include?(s) || s == @server }
+        writable = ready[1].select { |s| @responses.map(&:client_socket).include?(s) }
 
         readable.each do |socket|
           if socket == @server
@@ -64,8 +69,6 @@ module WebServerLight
           response = @responses.select { |r| r.client_socket == socket }.first
           handle_response response
         end
-
-        get_rid_of_stale
       end
     end
 
@@ -113,37 +116,39 @@ module WebServerLight
       response.write
       return unless response.written?
 
-      end_up_with_response(response)
+      end_up_with_client(response)
     end
 
     # Удалить reponse из очереди @responses, освободить более неиспользуемые
     # ресурсы (io объекты, данные которых были переданы клиенту), а также
-    # закрыть связанное с response клиентское соединение, если работа с ним
-    # завершена.
-    def end_up_with_response(response, close_conn = true)
-      log "closing #{response.client_socket}"
+    # закрыть связанное с response клиентское соединение, обновить счетчик
+    # обслуживаемых клиентов и собрать статистику в случае, если файл
+    # успешно доставлен клиенту.
+    def end_up_with_client(client)
+      if client.is_a?(Response)
+        @responses.delete(client)
+      else
+        @requests.delete(client)
+      end
 
-      @responses.delete(response)
-      close_conn ? response.close : response.close_ios
+      client.close
 
+      collect_stats(client) if(client.is_a?(Response))
+    end
+
+    def collect_stats(response)
       return unless response.success? && response.status.is_a?(HTTPStatus::HTTPStatus200)
 
       @stats_collector.collect(response.body)
     end
 
     def get_rid_of_stale
-      stales_count = 0
+      before_count = @requests.size + @responses.size
 
-      [@requests, @responses].each do |queue|
-        stales = queue.select { |r| r.stale? }
+      @requests.select { |r| r.stale? }.each { |r| end_up_with_client(r) }
+      @responses.select { |r| r.stale? }.each { |r| end_up_with_client(r) }
 
-        stales.each do |stale|
-          stale.close
-          queue.delete(stale)
-        end
-
-        stales_count += stales.size
-      end
+      stales_count = before_count - @requests.size - @responses.size
 
       unless stales_count.zero?
         log("got rid of #{stales_count} stale(s)", 'yellow')
