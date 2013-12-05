@@ -47,8 +47,13 @@ module WebServerLight
 
         readable.each do |socket|
           if socket == @server
-            client_socket = @server.accept
-            push_request(Request.new(client_socket))
+            begin
+              client_socket = @server.accept_nonblock
+              push_request(Request.new(client_socket))
+            rescue IO::WaitReadable, Errno::EINTR
+              # Другой воркер принял это входящее соединение во время
+              # переключения контекста.
+            end
           else
             request = @requests.select { |r| r.client_socket == socket }.first
             handle_request request
