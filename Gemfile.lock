@@ -2,9 +2,11 @@ GEM
   remote: https://rubygems.org/
   specs:
     colorize (0.6.0)
+    localmemcache (0.4.4)
 
 PLATFORMS
   ruby
 
 DEPENDENCIES
   colorize
+  localmemcache
